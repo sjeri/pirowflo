@@ -121,7 +121,7 @@ sudo chmod 655 /etc/systemd/system/supervisord.service
 sudo systemctl enable supervisord
 sudo rm /tmp/pirowflo*
 sudo rm /tmp/supervisord.log
-sudo systemctl start memcached.service
+sudo systemctl enable memcached.service
 
 echo " "
 echo "------------------------------------------------------------"
