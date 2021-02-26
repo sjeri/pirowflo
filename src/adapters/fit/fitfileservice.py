@@ -241,8 +241,9 @@ class FitThread(threading.Thread):
                 if hrm_id:
                     for section in config.sections():
                         config_hrm_id = config[section].get('hrm_id', None)
-                        if config_hrm_id and config_hrm_id == hrm_id:
+                        if config_hrm_id and str(config_hrm_id) == str(hrm_id):
                             profilename = section
+                            break
                 profile = {}
                 if profilename:
                     profile = config[f"{profilename}"]
@@ -262,12 +263,11 @@ class FitThread(threading.Thread):
                     userinfo = gcau.get_userinfo()
                     userstats = gcau.get_stats()
                 bodydata = {}
-                bodydata['gender'] = Gender[userinfo.get('genderType', profile.get('gender', 'MALE'))].value
-                bodydata['age'] = int(userinfo.get('age', profile.get('age', 40)))
-                bodydata['height'] = int(userinfo.get('height', profile.get('height', 178)))
-                bodydata['weight'] = int(float(userinfo.get('weight', profile.get('weight', 85.8) * 1000)) / 1000 * 10)
-                bodydata['resting_heart_rate'] = int(
-                    userstats.get('restingHeartRate', profile.get('minhr', 60)))
+                bodydata['gender'] = Gender[userinfo.get('genderType') or profile.get('gender', 'MALE')].value
+                bodydata['age'] = int(userinfo.get('age') or profile.get('age', 40))
+                bodydata['height'] = int(userinfo.get('height') or profile.get('height', 178))
+                bodydata['weight'] = int(float(userinfo.get('weight') or profile.get('weight', 85.8) * 1000) / 1000 * 10)
+                bodydata['resting_heart_rate'] = int(userstats.get('restingHeartRate') or profile.get('minhr', 60))
                 bodydata['default_max_heart_rate'] = 220 - bodydata['age'] \
                     if bodydata['gender'] == Gender.MALE.value else 226 - bodydata['age']
                 logger.info(bodydata)
