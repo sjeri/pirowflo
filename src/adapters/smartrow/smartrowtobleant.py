@@ -6,6 +6,9 @@ import threading
 from time import sleep
 import time
 from copy import deepcopy
+from pymemcache.client.base import Client as MemCclient
+from pymemcache import serde
+from datetime import datetime, timezone
 
 from . import smartrowreader
 
@@ -65,7 +68,7 @@ class DataLogger():
 
 
     def elapsedtime(self):
-        print(self.fullstop)
+        #print(self.fullstop)
         if self.fullstop == False:
             elaspedtimecalc = int(time.time() - self.starttime)
             self.WRValues.update({'elapsedtime':elaspedtimecalc})
@@ -86,7 +89,6 @@ class DataLogger():
 
         if event[0] == self.WORK_STROKE_LENGTH_MESSAGE:
             event = event.replace(" ", "0")
-            #print(event)
             self.WRValues.update({'total_distance_m': int((event[1:6]))})
             self.WRValues.update({'work': float(event[7:11])/10})
             self.WRValues.update({'stroke_length': int((event[11:14]))})
@@ -146,7 +148,7 @@ class DataLogger():
                 self.fullstop = False
             self.elapsedtime()
 
-        print(self.WRValues)
+        #print(self.WRValues)
 
 
 def connectSR(manager,smartrow):
@@ -170,7 +172,12 @@ def heartbeat(sr):
 
 def main(in_q, ble_out_q,ant_out_q):
     # this starts discovery, calls manager.run() and returns manager.smartrowmac
-    # 
+    #
+    try:
+        mcclient = MemCclient('127.0.0.1:11211', serde=serde.pickle_serde, key_prefix=b'pirowflo_')
+        mcclient.version()
+    except Exception:
+        mcclient = None
     macaddresssmartrower = smartrowreader.connecttosmartrow()
     manager = gatt.DeviceManager(adapter_name='hci0')
     smartrow = smartrowreader.SmartRow(mac_address=macaddresssmartrower, manager=manager)
@@ -181,7 +188,7 @@ def main(in_q, ble_out_q,ant_out_q):
     BC.start()
 
     logger.info("SmartRow Ready and sending data to BLE and ANT Thread")
-    while not smartrow.ready() :
+    while not smartrow.ready():
       sleep(0.2)
 
     print("starting heart beat")
@@ -193,16 +200,21 @@ def main(in_q, ble_out_q,ant_out_q):
     reset(smartrow)
     sleep(1)
     SRtoBLEANT.Initial_reset = True # this should help to check if the first reset has been performed
-
     while True:
         if not in_q.empty():
             ResetRequest_ble = in_q.get()
             print(ResetRequest_ble)
             reset(smartrow)
+            if mcclient:
+                mcclient.set({'RESET': "True"}, expire=3)
         else:
             pass
         ble_out_q.append(SRtoBLEANT.WRValues)
         ant_out_q.append(SRtoBLEANT.WRValues)
+        if mcclient:
+            memcache_value = {k.replace(' ', '_'): v for k, v in SRtoBLEANT.WRValues.items()}
+            memcache_value.update({'message_time': datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")})
+            mcclient.set_many(memcache_value, expire=30)
         sleep(0.1)
 
 if __name__ == '__main__':

@@ -32,6 +32,7 @@ from adapters.ble import waterrowerble
 from adapters.s4 import wrtobleant
 from adapters.ant import waterrowerant
 from adapters.smartrow import smartrowtobleant
+from adapters.fit.fitfileservice import FitThread
 import pathlib
 import signal
 
@@ -119,6 +120,15 @@ def main(args=None):
     else:
         logger.info("Ant service not used")
 
+    if args.fit:
+        fit = FitThread()
+        fit.daemon = True
+        fit.start()
+        threads.append(fit)
+    else:
+        logger.info("FIT service not used")
+        fit = None
+
     while grace.run:
         for thread in threads:
             if grace.run == True:
@@ -126,6 +136,9 @@ def main(args=None):
                 if not thread.is_alive():
                     logger.info("Thread died - exiting")
                     return
+    else:
+        if fit and fit.is_alive():
+            fit.dump()
 
 if __name__ == '__main__':
     try:
@@ -133,6 +146,9 @@ if __name__ == '__main__':
         parser.add_argument("-i", "--interface", choices=["s4","sr"], default="s4", help="choose  Waterrower interface S4 monitor: s4 or Smartrow: sr")
         parser.add_argument("-b", "--blue", action='store_true', default=False,help="Broadcast Waterrower data over bluetooth low energy")
         parser.add_argument("-a", "--antfe", action='store_true', default=False,help="Broadcast Waterrower data over Ant+")
+        parser.add_argument("-f", "--fit", action='store_true', default=False,help="Store a FIT file for the session, dumped on Interrupt, " +
+                                                                                   "Upload FIT file to GC on session end, " +
+                                                                                   "provide HRM to select user from config file based on registered HRM")
         args = parser.parse_args()
         logger.info(args)
         main(args)

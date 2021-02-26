@@ -46,6 +46,9 @@ class clsAntDongle():
     channel_FE = 0  # ANT+ channel for Fitness Equipment
     channel_FE_s = channel_FE  # slave=Cycle Training Program
 
+    channel_HRM = 1           # ANT+ channel for Heart Rate Monitor
+    channel_HRM_s = channel_HRM # slave=display or Cycle Training Program
+
     DeviceNumber_FE = 57591  # These are the device-numbers FortiusANT uses and
 
     ModelNumber_FE = 2875  # short antifier-value=0x8385, Tacx Neo=2875
@@ -88,15 +91,17 @@ class clsAntDongle():
 
     # profile.xlsx: antplus_device_type
     DeviceTypeID_fitness_equipment = 17
+    DeviceTypeID_heart_rate = 120
+
 
     # Manufacturer ID       see FitSDKRelease_21.20.00 profile.xlsx
     Manufacturer_garmin = 1
     Manufacturer_dynastream = 15
     Manufacturer_dev = 255
     Manufacturer_waterrower = 118
-
+    DeviceTypeID_HRM = DeviceTypeID_heart_rate
     DeviceTypeID_FE = DeviceTypeID_fitness_equipment
-
+    TransmissionType_ANY = 0
     TransmissionType_IC = 0x01  # 5.2.3.1   Transmission Type
     TransmissionType_IC_GDP = 0x05  # 0x01 = Independant Channel
     #           0x04 = Global datapages used
@@ -462,6 +467,20 @@ class clsAntDongle():
         print("create Channel")
         self.Write(messages)
 
+    def SlaveHRM_ChannelConfig(self, DeviceNumber):
+        if DeviceNumber > 0: s = ", id=%s only" % DeviceNumber
+        else:                s = ", any device"
+        messages=[
+            self.msg42_AssignChannel         (self.channel_HRM_s, self.ChannelType_BidirectionalReceive, NetworkNumber=0x00),
+            self.msg51_ChannelID             (self.channel_HRM_s, DeviceNumber, self.DeviceTypeID_HRM, self.TransmissionType_ANY),
+            self.msg45_ChannelRfFrequency    (self.channel_HRM_s, self.RfFrequency_2457Mhz),
+            self.msg43_ChannelPeriod         (self.channel_HRM_s, ChannelPeriod=8070),        # 4,06 Hz
+            self.msg60_ChannelTransmitPower  (self.channel_HRM_s, self.TransmitPower_0dBm),
+            self.msg4B_OpenChannel           (self.channel_HRM_s),
+            self.msg4D_RequestMessage        (self.channel_HRM_s, self.msgID_ChannelID)
+        ]
+        self.Write(messages)
+
     # -------------------------------------------------------------------------------
     # E n u m e r a t e A l l
     # -------------------------------------------------------------------------------
@@ -580,6 +599,7 @@ class clsAntDongle():
         info = struct.pack(format, ChannelNumber)
         msg = self.ComposeMessage(0x41, info)
         return msg
+
 
 
     # ------------------------------------------------------------------------------
@@ -766,7 +786,20 @@ class clsAntDongle():
 
         return tuple[0], tuple[1], tuple[2], tuple[3], tuple[4], tuple[5], tuple[6], tuple[7]
 
+    def msgUnpage_Hrm (self,info):
+        fChannel            = sc.unsigned_char  #0 First byte of the ANT+ message content
+        fDataPageNumber     = sc.unsigned_char  #1 First byte of the ANT+ datapage (payload)
+        fSpec1              = sc.unsigned_char  #2
+        fSpec2              = sc.unsigned_char  #3
+        fSpec3              = sc.unsigned_char  #4
+        fHeartBeatEventTime = sc.unsigned_short #5
+        fHeartBeatCount     = sc.unsigned_char  #6
+        fHeartRate          = sc.unsigned_char  #7
 
+        format      = sc.no_alignment + fChannel + fDataPageNumber + fSpec1 + fSpec2 + fSpec3 + fHeartBeatEventTime +  fHeartBeatCount + fHeartRate
+        tuple = struct.unpack (format, info)
+
+        return tuple[0], tuple[1], tuple[2], tuple[3], tuple[4], tuple[5], tuple[6], tuple[7]
     # ------------------------------------------------------------------------------
     # P a g e 2 5   T r a i n e r   i n f o
     # ------------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 import gatt
 import logging
 import threading
-from time import time
+from time import sleep
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +117,7 @@ def connecttosmartrow():
     manager.start_discovery()  # from the DeviceManager class call the methode start_discorvery
     manager.run()
     while not manager.ready(): # hold the thread locked a checks if SmartRow has been found. Then gives other process 0.2 sec time to work
-        time.sleep(0.2)
+        sleep(0.2)
     logger.info("found SmartRow macaddress")
     macaddresssmartrower = manager.smartrowmac    
     return macaddresssmartrower
