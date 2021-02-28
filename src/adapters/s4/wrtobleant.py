@@ -11,6 +11,10 @@ import numpy
 from copy import deepcopy
 
 from . import waterrowerinterface
+from pymemcache.client.base import Client as MemCclient
+from pymemcache import serde
+from datetime import datetime, timezone
+
 
 logger = logging.getLogger(__name__)
 '''
@@ -206,6 +210,11 @@ class DataLogger(object):
         self.ANTvalues = self.get_WRValues()
 
 def main(in_q, ble_out_q,ant_out_q):
+    try:
+        mcclient = MemCclient('127.0.0.1:11211', serde=serde.pickle_serde, key_prefix=b'pirowflo_')
+        mcclient.version()
+    except Exception:
+        mcclient = None
     S4 = waterrowerinterface.Rower()
     S4.open()
     S4.reset_request()
@@ -216,6 +225,8 @@ def main(in_q, ble_out_q,ant_out_q):
             ResetRequest_ble = in_q.get()
             print(ResetRequest_ble)
             S4.reset_request()
+            if mcclient:
+                mcclient.set('RESET', "True", expire=3)
         else:
             pass
         WRtoBLEANT.SendToBLE()
@@ -226,6 +237,10 @@ def main(in_q, ble_out_q,ant_out_q):
         #print(ant_out_q)
         #logger.info(WRtoBLEANT.BLEvalues)
         #ant_out_q.append(WRtoBLEANT.ANTvalues)
+        if mcclient:
+            memcache_value = {k.replace(' ', '_'): v for k, v in WRtoBLEANT.WRValues.items()}
+            memcache_value.update({'message_time': datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")})
+            mcclient.set_many(memcache_value, expire=10)
         time.sleep(0.1)
 
 

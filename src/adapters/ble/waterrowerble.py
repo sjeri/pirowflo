@@ -12,6 +12,8 @@ import dbus.exceptions
 import dbus.mainloop.glib
 import dbus.service
 import struct
+from pymemcache.client.base import Client as MemCclient
+from pymemcache import serde
 
 from .ble import (
     Advertisement,
@@ -34,6 +36,12 @@ except ImportError:
     import gobject as GObject
 
     MainLoop = GObject.MainLoop
+
+try:
+    mcclient = MemCclient('127.0.0.1:11211', serde=serde.pickle_serde, key_prefix=b'pirowflo_')
+    mcclient.version()
+except Exception:
+    mcclient = None
 
 DBUS_OM_IFACE = "org.freedesktop.DBus.ObjectManager"
 DBUS_PROP_IFACE = "org.freedesktop.DBus.Properties"
@@ -89,6 +97,11 @@ def request_reset_ble():
 def Convert_Waterrower_raw_to_byte():
 
     WaterrowerValuesRaw = ble_in_q_value.pop()
+    HRMValue = None
+    if mcclient:
+        HRMValue = mcclient.get('HRM_Rate', default=None)
+    if HRMValue and HRMValue > 0:
+        WaterrowerValuesRaw['heart_rate'] = HRMValue
     WRBytearray = []
     #print("Ble Values: {0}".format(WaterrowerValuesRaw))
     for keys in WaterrowerValuesRaw:

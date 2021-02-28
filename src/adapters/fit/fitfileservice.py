@@ -30,8 +30,6 @@ class Gender(Enum):
 
 
 class DataLogger:
-    CONSTANT = "a"
-
     def __init__(self):
         self.lap_WRValues = []
 
@@ -210,6 +208,7 @@ class FitThread(threading.Thread):
                     self.pause_cond.wait()
             reset = self.mcclient.get('RESET', default=None) if self.mcclient else None
             if reset:
+                self.dump()
                 self.dl = None
             if not self.dl:
                 self.dl = DataLogger()
@@ -230,7 +229,8 @@ class FitThread(threading.Thread):
         logger.info("closing thread " + self.getName())
 
     def dump(self):
-        if len(self.dl.lap_WRValues) > 0:
+        # store FIT only on session larger than 20m (this avoids trouble when e.g. BLE device initiates initial reset)
+        if len(self.dl.lap_WRValues) > 0 and self.dl.lap_WRValues[-1][-1]['distance'] > 20:
             try:
                 config = configparser.ConfigParser()
                 logger.info(f"looking for rowers.conf in {os.path.join(os.path.dirname(__file__), 'rowers.conf')} " +
@@ -296,3 +296,4 @@ class FitThread(threading.Thread):
     def terminate(self):
         logger.info("terminate fitfileservice")
         self.loop = False
+        self.dump()

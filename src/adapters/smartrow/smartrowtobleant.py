@@ -206,7 +206,7 @@ def main(in_q, ble_out_q,ant_out_q):
             print(ResetRequest_ble)
             reset(smartrow)
             if mcclient:
-                mcclient.set({'RESET': "True"}, expire=3)
+                mcclient.set('RESET', "True", expire=3)
         else:
             pass
         ble_out_q.append(SRtoBLEANT.WRValues)
@@ -214,7 +214,7 @@ def main(in_q, ble_out_q,ant_out_q):
         if mcclient:
             memcache_value = {k.replace(' ', '_'): v for k, v in SRtoBLEANT.WRValues.items()}
             memcache_value.update({'message_time': datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")})
-            mcclient.set_many(memcache_value, expire=30)
+            mcclient.set_many(memcache_value, expire=10)
         sleep(0.1)
 
 if __name__ == '__main__':

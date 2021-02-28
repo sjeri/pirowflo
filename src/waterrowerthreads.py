@@ -136,9 +136,9 @@ def main(args=None):
                 if not thread.is_alive():
                     logger.info("Thread died - exiting")
                     return
-    else:
+    else:  # run things to be done before actual INTERRUPT is finished
         if fit and fit.is_alive():
-            fit.dump()
+            fit.terminate()
 
 if __name__ == '__main__':
     try:
