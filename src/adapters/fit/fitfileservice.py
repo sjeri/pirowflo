@@ -202,35 +202,40 @@ class FitThread(threading.Thread):
 
     def run(self):
         logger.info("starting thread " + self.getName())
+        reset_occured = False
         while self.loop:
             with self.pause_cond:
                 while self.paused:
                     self.pause_cond.wait()
             reset = self.mcclient.get('RESET', default=None) if self.mcclient else None
-            if reset:
+            if reset and not reset_occured:
                 self.dump()
                 self.dl = None
-            if not self.dl:
-                self.dl = DataLogger()
-            if self.mcclient:
-                WRValues = self.mcclient.get_many((
-                    'message_time', 'stroke_rate', 'total_strokes', 'total_distance_m',
-                    'instantaneous_pace', 'speed', 'watts', 'total_kcal', 'total_kcal_hour',
-                    'total_kcal_min', 'heart_rate', 'elapsedtime', 'work', 'stroke_length',
-                    'force', 'watts_avg', 'pace_avg'))
-                if len(WRValues.keys()) > 0:
-                    HRMValue = self.mcclient.get('HRM_Rate', default=None)
-                    if HRMValue and HRMValue > 0:
-                        WRValues['heart_rate'] = HRMValue
-                    self.dl.store(WRValues)
+                reset_occured = True
+            elif reset and reset_occured:
+                pass
+            else:
+                if not self.dl:
+                    self.dl = DataLogger()
+                if self.mcclient:
+                    WRValues = self.mcclient.get_many((
+                        'message_time', 'stroke_rate', 'total_strokes', 'total_distance_m',
+                        'instantaneous_pace', 'speed', 'watts', 'total_kcal', 'total_kcal_hour',
+                        'total_kcal_min', 'heart_rate', 'elapsedtime', 'work', 'stroke_length',
+                        'force', 'watts_avg', 'pace_avg', 'HRM_Rate'))
+                    hrm = WRValues.get('HRM_Rate', 0)
+                    if len(WRValues.keys()) > 0:
+                        self.dl.store(WRValues)
+                        if hrm > 0:
+                            WRValues['heart_rate'] = hrm
                 else:
                     pass
             sleep(1)
         logger.info("closing thread " + self.getName())
 
     def dump(self):
-        # store FIT only on session larger than 20m (this avoids trouble when e.g. BLE device initiates initial reset)
-        if len(self.dl.lap_WRValues) > 0 and self.dl.lap_WRValues[-1][-1]['distance'] > 20:
+        # store FIT only on session larger than 50m (this avoids trouble when e.g. BLE device initiates initial reset)
+        if len(self.dl.lap_WRValues) > 0 and self.dl.lap_WRValues[-1][-1]['distance'] > 5000:
             try:
                 config = configparser.ConfigParser()
                 logger.info(f"looking for rowers.conf in {os.path.join(os.path.dirname(__file__), 'rowers.conf')} " +

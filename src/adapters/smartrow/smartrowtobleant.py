@@ -81,72 +81,75 @@ class DataLogger():
             self.WRValues.update({'elapsedtime': 0})
 
     def on_row_event(self, event):
-        if event[0] == self.ENERGIE_KCAL_MESSAGE:
-            event = event.replace(" ", "0")
-            self.WRValues.update({'total_distance_m': int((event[1:6]))})
-            self.WRValues.update({'total_kcal': int((event[6:10]))})
-            self.elapsedtime()
+        try:
+            if event[0] == self.ENERGIE_KCAL_MESSAGE:
+                event = event.replace(" ", "0")
+                self.WRValues.update({'total_distance_m': int((event[1:6]))})
+                self.WRValues.update({'total_kcal': int((event[6:10]))})
+                self.elapsedtime()
 
-        if event[0] == self.WORK_STROKE_LENGTH_MESSAGE:
-            event = event.replace(" ", "0")
-            self.WRValues.update({'total_distance_m': int((event[1:6]))})
-            self.WRValues.update({'work': float(event[7:11])/10})
-            self.WRValues.update({'stroke_length': int((event[11:14]))})
-            self.elapsedtime()
+            if event[0] == self.WORK_STROKE_LENGTH_MESSAGE:
+                event = event.replace(" ", "0")
+                self.WRValues.update({'total_distance_m': int((event[1:6]))})
+                self.WRValues.update({'work': float(event[7:11])/10})
+                self.WRValues.update({'stroke_length': int((event[11:14]))})
+                self.elapsedtime()
 
-        if event[0] == self.POWER_MESSAGE:
-            event = event.replace(" ", "0")
-            self.WRValues.update({'total_distance_m': int((event[1:6]))})
-            if self.SmartRowHalt == True:
-                self.WRValues.update({'watts': 0})
-            else:
-                self.WRValues.update({'watts': int((event[6:9]))})
-            self.WRValues.update({'watts_avg': float((event[9:14]))/10})
-            self.elapsedtime()
+            if event[0] == self.POWER_MESSAGE:
+                event = event.replace(" ", "0")
+                self.WRValues.update({'total_distance_m': int((event[1:6]))})
+                if self.SmartRowHalt == True:
+                    self.WRValues.update({'watts': 0})
+                else:
+                    self.WRValues.update({'watts': int((event[6:9]))})
+                self.WRValues.update({'watts_avg': float((event[9:14]))/10})
+                self.elapsedtime()
 
-        if event[0] == self.STROKE_RATE_STROKE_COUNT_MESSAGE:
-            event = event.replace(" ", "0")
-            self.WRValues.update({'total_distance_m': int((event[1:6]))})
-            if self.SmartRowHalt == True:
-                self.WRValues.update({'stroke_rate': 0})
-            else:
-                self.WRValues.update({'stroke_rate': float((event[6:8]))*2})
-            self.WRValues.update({'total_strokes':int((event[9:13]))})
-            self.elapsedtime()
+            if event[0] == self.STROKE_RATE_STROKE_COUNT_MESSAGE:
+                event = event.replace(" ", "0")
+                self.WRValues.update({'total_distance_m': int((event[1:6]))})
+                if self.SmartRowHalt == True:
+                    self.WRValues.update({'stroke_rate': 0})
+                else:
+                    self.WRValues.update({'stroke_rate': float((event[6:8]))*2})
+                self.WRValues.update({'total_strokes':int((event[9:13]))})
+                self.elapsedtime()
 
-        if event[0] == self.PACE_MESSAGE:
-            event = event.replace(" ", "0")
-            self.WRValues.update({'total_distance_m': int((event[1:6]))})
-            pace_inst = int(event[6])*60 + int(event[7:9])
-            if self.SmartRowHalt == True:
-                self.WRValues.update({'instantaneous pace': 0})
-                self.WRValues.update({'speed': 0})
-            else:
-                self.WRValues.update({'instantaneous pace': pace_inst})
-            if pace_inst != 0:
-                speed = int(500 * 100 / pace_inst) # speed in cm/s
-                self.WRValues.update({'speed': speed})
-            else:
-                self.WRValues.update({'speed': 0})
-            pace_avg = int(event[9])*60 + int(event[10:12])
-            self.WRValues.update({'pace_avg': pace_avg})
-            self.elapsedtime()
+            if event[0] == self.PACE_MESSAGE:
+                event = event.replace(" ", "0")
+                self.WRValues.update({'total_distance_m': int((event[1:6]))})
+                pace_inst = int(event[6])*60 + int(event[7:9])
+                if self.SmartRowHalt == True:
+                    self.WRValues.update({'instantaneous pace': 0})
+                    self.WRValues.update({'speed': 0})
+                else:
+                    self.WRValues.update({'instantaneous pace': pace_inst})
+                if pace_inst != 0:
+                    speed = int(500 * 100 / pace_inst) # speed in cm/s
+                    self.WRValues.update({'speed': speed})
+                else:
+                    self.WRValues.update({'speed': 0})
+                pace_avg = int(event[9])*60 + int(event[10:12])
+                self.WRValues.update({'pace_avg': pace_avg})
+                self.elapsedtime()
 
-        if event[0] == self.FORCE_MESSAGE:
-            event = event.replace(" ", "0")
-            self.WRValues.update({'total_distance_m': int((event[1:6]))})
-            self.WRValues.update({'force': int((event[7:11]))})
-            if event[11] == "!":
-                self.SmartRowHalt = True
-                self.fullstop = True
-            elif self.starttime == None:
-                self.starttime = time.time()
-                self.SmartRowHalt = False
-                self.fullstop = False
-            else:
-                self.SmartRowHalt = False
-                self.fullstop = False
-            self.elapsedtime()
+            if event[0] == self.FORCE_MESSAGE:
+                event = event.replace(" ", "0")
+                self.WRValues.update({'total_distance_m': int((event[1:6]))})
+                self.WRValues.update({'force': int((event[7:11]))})
+                if event[11] == "!":
+                    self.SmartRowHalt = True
+                    self.fullstop = True
+                elif self.starttime == None:
+                    self.starttime = time.time()
+                    self.SmartRowHalt = False
+                    self.fullstop = False
+                else:
+                    self.SmartRowHalt = False
+                    self.fullstop = False
+                self.elapsedtime()
+        except ValueError as e:
+            logger.warning("caught non int value, skipping")
 
         #print(self.WRValues)
 
@@ -170,7 +173,7 @@ def heartbeat(sr):
         sleep(1)
 
 
-def main(in_q, ble_out_q,ant_out_q):
+def main():
     # this starts discovery, calls manager.run() and returns manager.smartrowmac
     #
     try:
@@ -200,21 +203,19 @@ def main(in_q, ble_out_q,ant_out_q):
     reset(smartrow)
     sleep(1)
     SRtoBLEANT.Initial_reset = True # this should help to check if the first reset has been performed
+    reset_occured = False
     while True:
-        if not in_q.empty():
-            ResetRequest_ble = in_q.get()
-            print(ResetRequest_ble)
+        reset_event = mcclient.get('RESET', default=None) if mcclient else None
+        if reset_event and not reset_occured:
+            print(reset_event)
             reset(smartrow)
-            if mcclient:
-                mcclient.set('RESET', "True", expire=3)
-        else:
-            pass
-        ble_out_q.append(SRtoBLEANT.WRValues)
-        ant_out_q.append(SRtoBLEANT.WRValues)
+            reset_occured = True
+        if reset_occured and not reset_event:
+            reset_occured = False
         if mcclient:
             memcache_value = {k.replace(' ', '_'): v for k, v in SRtoBLEANT.WRValues.items()}
             memcache_value.update({'message_time': datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")})
-            mcclient.set_many(memcache_value, expire=10)
+            mcclient.set_many(memcache_value, expire=3)
         sleep(0.1)
 
 if __name__ == '__main__':

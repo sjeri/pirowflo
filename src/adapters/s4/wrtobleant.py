@@ -55,8 +55,6 @@ class DataLogger(object):
         self.WRValues_rst = None
         self.WRValues = None
         self.WRValues_standstill = None
-        self.BLEvalues = None
-        self.ANTvalues = None
         self.secondsWR = None
         self.minutesWR = None
         self.hoursWR = None
@@ -93,8 +91,6 @@ class DataLogger(object):
             }
         self.WRValues = deepcopy(self.WRValues_rst)
         self.WRValues_standstill = deepcopy(self.WRValues_rst)
-        self.BLEvalues = deepcopy(self.WRValues_rst)
-        self.ANTvalues = deepcopy(self.WRValues_rst)
         self.secondsWR = 0
         self.minutesWR = 0
         self.hoursWR = 0
@@ -202,14 +198,7 @@ class DataLogger(object):
         else:
             return deepcopy(self.WRValues_standstill)
 
-    def SendToBLE(self):
-        self.BLEvalues = self.get_WRValues()
-        #logger.debug("Watts: %4.1f Strokes: %5d Strokes/s: %5f Dist: %5g", self.BLEvalues['watts'], self.BLEvalues['total_strokes'], self.BLEvalues['stroke_rate'], self.BLEvalues['total_distance_m'])
-
-    def SendToANT(self):
-        self.ANTvalues = self.get_WRValues()
-
-def main(in_q, ble_out_q,ant_out_q):
+def main():
     try:
         mcclient = MemCclient('127.0.0.1:11211', serde=serde.pickle_serde, key_prefix=b'pirowflo_')
         mcclient.version()
@@ -220,27 +209,19 @@ def main(in_q, ble_out_q,ant_out_q):
     S4.reset_request()
     WRtoBLEANT = DataLogger(S4)
     logger.info("Waterrower Ready and sending data to BLE and ANT Thread")
+    reset_occured = False
     while True:
-        if not in_q.empty():
-            ResetRequest_ble = in_q.get()
-            print(ResetRequest_ble)
+        reset = mcclient.get('RESET', default=None) if mcclient else None
+        if reset and not reset_occured:
+            print(reset)
             S4.reset_request()
-            if mcclient:
-                mcclient.set('RESET', "True", expire=3)
-        else:
-            pass
-        WRtoBLEANT.SendToBLE()
-        WRtoBLEANT.SendToANT()
-        ble_out_q.append(WRtoBLEANT.BLEvalues)
-        ant_out_q.append(WRtoBLEANT.ANTvalues) # here it is a class deque
-        #print(type(ant_out_q))
-        #print(ant_out_q)
-        #logger.info(WRtoBLEANT.BLEvalues)
-        #ant_out_q.append(WRtoBLEANT.ANTvalues)
+            reset_occured = True
+        if reset_occured and not reset:
+            reset_occured = False
         if mcclient:
-            memcache_value = {k.replace(' ', '_'): v for k, v in WRtoBLEANT.WRValues.items()}
+            memcache_value = {k.replace(' ', '_'): v for k, v in WRtoBLEANT.get_WRValues().items()}
             memcache_value.update({'message_time': datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")})
-            mcclient.set_many(memcache_value, expire=10)
+            mcclient.set_many(memcache_value, expire=3)
         time.sleep(0.1)
 
 

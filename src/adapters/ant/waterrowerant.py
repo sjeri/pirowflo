@@ -8,7 +8,7 @@ import time
 import logging
 logger = logging.getLogger(__name__)
 
-def main(ant_in_q):
+def main():
     EventCounter = 0
     messages = []       # messages to be sent to
     AntHRMpaired = False
@@ -28,18 +28,24 @@ def main(ant_in_q):
     Antdongle.SlaveHRM_ChannelConfig(0) #device ID is any! whoever is first, wins...
     sleep(0.25)
     Waterrower = fe.antFE(Antdongle) # hand over the class to antfe to give acces to the dongle
-
+    last_message_time = None
     while True:
         StartTime = time.time()
-        if len(ant_in_q) != 0: #as long as the deque data from WR are not empty
-            WaterrowerValuesRaw = ant_in_q.pop() # remove it from the deque and put in variable
-            if AntHRMpaired:
-                WaterrowerValuesRaw['heart_rate'] = HRM_Rate
-                if mcclient:
-                    mcclient.set_many({'HRM_Rate': HRM_Rate, 'HRM_ID': HRM_ID}, expire=10)
-            Waterrower.EventCounter = EventCounter # set the eventcounter of the instance
-            Waterrower.BroadcastTrainerDataMessage(WaterrowerValuesRaw) # insert data into instance, heartrate is 250ms old value from previous run
-            messages.append(Waterrower.fedata) # depending on the event counter value load the message arrey with the either Fitness equipement, rowerdata, manu data or product data
+        if mcclient: #as long as the deque data from WR are not empty
+            WaterrowerValuesRaw = mcclient.get_many((
+                'message_time', 'stroke_rate', 'total_strokes', 'total_distance_m',
+                'instantaneous_pace', 'speed', 'watts', 'total_kcal', 'total_kcal_hour',
+                'total_kcal_min', 'heart_rate', 'elapsedtime', 'work', 'stroke_length',
+                'force', 'watts_avg', 'pace_avg'))  # ant_in_q.pop() # remove it from the deque and put in variable
+            mt = WaterrowerValuesRaw.pop('message_time', None)
+            if len(WaterrowerValuesRaw.keys()) > 0 and mt != last_message_time:
+                last_message_time = mt
+                if AntHRMpaired:
+                    WaterrowerValuesRaw['heart_rate'] = HRM_Rate
+                    mcclient.set_many({'HRM_Rate': HRM_Rate, 'HRM_ID': HRM_ID}, expire=3)
+                Waterrower.EventCounter = EventCounter # set the eventcounter of the instance
+                Waterrower.BroadcastTrainerDataMessage(WaterrowerValuesRaw) # insert data into instance, heartrate is 250ms old value from previous run
+                messages.append(Waterrower.fedata) # depending on the event counter value load the message arrey with the either Fitness equipement, rowerdata, manu data or product data
         if len(messages) > 0:
             data = Antdongle.Write(messages, True, False) # check if length of array is greater than 0 if yes then send data over Ant+
         else:
