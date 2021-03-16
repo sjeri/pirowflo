@@ -32,6 +32,7 @@ from adapters.ble import waterrowerble
 from adapters.s4 import wrtobleant
 from adapters.ant import waterrowerant
 from adapters.smartrow import smartrowtobleant
+from adapters.fit.fitfileservice import FitThread
 import pathlib
 import signal
 
@@ -58,36 +59,32 @@ def main(args=None):
     logging.config.fileConfig(loggerconfigpath, disable_existing_loggers=False)
     grace = Graceful()
 
-    def BleService(out_q, ble_in_q):
+    def BleService():
         logger.info("Start BLE Advertise and BLE GATT Server")
-        bleService = waterrowerble.main(out_q, ble_in_q)
+        bleService = waterrowerble.main()
         bleService()
 
 
-    def Waterrower(in_q, ble_out_q, ant_out_q):
+    def Waterrower():
         logger.info("Waterrower Interface started")
-        Waterrowerserial = wrtobleant.main(in_q, ble_out_q, ant_out_q)
+        Waterrowerserial = wrtobleant.main()
         Waterrowerserial()
 
-    def Smartrow(in_q, ble_out_q, ant_out_q):
+    def Smartrow():
         logger.info("Smartrow Interface started")
-        Smartrowconnection = smartrowtobleant.main(in_q, ble_out_q, ant_out_q)
+        Smartrowconnection = smartrowtobleant.main()
         Smartrowconnection()
 
-    def ANTService(ant_in_q):
+    def ANTService():
         logger.info("Start Ant and start broadcast data")
-        antService = waterrowerant.main(ant_in_q)
+        antService = waterrowerant.main()
         antService()
 
 
-    # TODO: Switch from queue to deque
-    q = Queue()
-    ble_q = deque(maxlen=1)
-    ant_q = deque(maxlen=1)
     threads = []
     if args.interface == "s4":
         logger.info("inferface S4 monitor will be used for data input")
-        t = threading.Thread(target=Waterrower, args=(q, ble_q, ant_q))
+        t = threading.Thread(target=Waterrower, args=())
         t.daemon = True
         t.start()
         threads.append(t)
@@ -96,7 +93,7 @@ def main(args=None):
 
     if args.interface == "sr":
         logger.info("inferface smartrow will be used for data input")
-        t = threading.Thread(target=Smartrow, args=(q, ble_q, ant_q))
+        t = threading.Thread(target=Smartrow, args=())
         t.daemon = True
         t.start()
         threads.append(t)
@@ -104,20 +101,29 @@ def main(args=None):
         logger.info("sr not selected")
 
     if args.blue == True:
-        t = threading.Thread(target=BleService, args=(q, ble_q))
+        t = threading.Thread(target=BleService, args=())
         t.daemon = True
         t.start()
         threads.append(t)
     else:
         logger.info("Bluetooth service not used")
     if args.antfe == True:
-        t = threading.Thread(target=ANTService, args=(
-        [ant_q]))  # [] are needed to tell threading that the list "deque" is one args and not a list of arguement !
+        t = threading.Thread(target=ANTService, args=())
+        # [] are needed to tell threading that the list "deque" is one args and not a list of arguement !
         t.daemon = True
         t.start()
         threads.append(t)
     else:
         logger.info("Ant service not used")
+
+    if args.fit:
+        fit = FitThread()
+        fit.daemon = True
+        fit.start()
+        threads.append(fit)
+    else:
+        logger.info("FIT service not used")
+        fit = None
 
     while grace.run:
         for thread in threads:
@@ -126,6 +132,9 @@ def main(args=None):
                 if not thread.is_alive():
                     logger.info("Thread died - exiting")
                     return
+    else:  # run things to be done before actual INTERRUPT is finished
+        if fit and fit.is_alive():
+            fit.terminate()
 
 if __name__ == '__main__':
     try:
@@ -133,6 +142,9 @@ if __name__ == '__main__':
         parser.add_argument("-i", "--interface", choices=["s4","sr"], default="s4", help="choose  Waterrower interface S4 monitor: s4 or Smartrow: sr")
         parser.add_argument("-b", "--blue", action='store_true', default=False,help="Broadcast Waterrower data over bluetooth low energy")
         parser.add_argument("-a", "--antfe", action='store_true', default=False,help="Broadcast Waterrower data over Ant+")
+        parser.add_argument("-f", "--fit", action='store_true', default=False,help="Store a FIT file for the session, dumped on Interrupt, " +
+                                                                                   "Upload FIT file to GC on session end, " +
+                                                                                   "provide HRM to select user from config file based on registered HRM")
         args = parser.parse_args()
         logger.info(args)
         main(args)

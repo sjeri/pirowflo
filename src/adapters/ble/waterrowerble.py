@@ -12,6 +12,8 @@ import dbus.exceptions
 import dbus.mainloop.glib
 import dbus.service
 import struct
+from pymemcache.client.base import Client as MemCclient
+from pymemcache import serde
 
 from .ble import (
     Advertisement,
@@ -34,6 +36,12 @@ except ImportError:
     import gobject as GObject
 
     MainLoop = GObject.MainLoop
+
+try:
+    mcclient = MemCclient('unix:/var/run/memcached/memcached.sock', serde=serde.pickle_serde, key_prefix=b'pirowflo_')
+    mcclient.version()
+except Exception:
+    mcclient = None
 
 DBUS_OM_IFACE = "org.freedesktop.DBus.ObjectManager"
 DBUS_PROP_IFACE = "org.freedesktop.DBus.Properties"
@@ -84,11 +92,10 @@ def register_app_error_cb(error):
 # for the WaterrowerInterface thread to get the signal to reset the waterrower.
 
 def request_reset_ble():
-    out_q_reset.put("reset_ble")
+    if mcclient:
+        mcclient.set('RESET', "True", expire=3)
 
-def Convert_Waterrower_raw_to_byte():
-
-    WaterrowerValuesRaw = ble_in_q_value.pop()
+def Convert_Waterrower_raw_to_byte(WaterrowerValuesRaw):
     WRBytearray = []
     #print("Ble Values: {0}".format(WaterrowerValuesRaw))
     for keys in WaterrowerValuesRaw:
@@ -101,8 +108,8 @@ def Convert_Waterrower_raw_to_byte():
     WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['total_distance_m'] & 0xff)))
     WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['total_distance_m'] & 0xff00) >> 8))
     WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['total_distance_m'] & 0xff0000) >> 16))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['instantaneous pace'] & 0xff)))
-    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['instantaneous pace'] & 0xff00) >> 8))
+    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['instantaneous_pace'] & 0xff)))
+    WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['instantaneous_pace'] & 0xff00) >> 8))
     WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['watts'] & 0xff)))
     WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['watts'] & 0xff00) >> 8))
     WRBytearray.append(struct.pack("B", (WaterrowerValuesRaw['total_kcal'] & 0xff)))
@@ -293,28 +300,37 @@ class RowerData(Characteristic):
             service)
         self.notifying = False
         self.iter = 0
+        self.last_message_time = None
 
     def Waterrower_cb(self):
 
-        if ble_in_q_value:
+        if mcclient:
+            WaterrowerValuesRaw = mcclient.get_many((
+                'message_time', 'stroke_rate', 'total_strokes', 'total_distance_m',
+                'instantaneous_pace', 'speed', 'watts', 'total_kcal', 'total_kcal_hour',
+                'total_kcal_min', 'heart_rate', 'elapsedtime', 'work', 'stroke_length',
+                'force', 'watts_avg', 'pace_avg', 'HRM_Rate'))
+            mt = WaterrowerValuesRaw.pop('message_time', None)
+            if len(WaterrowerValuesRaw.keys()) > 0 and mt and mt != self.last_message_time:
+                self.last_message_time = mt
+                hrm = WaterrowerValuesRaw.get('HRM_Rate', 0)
+                if hrm > 0:
+                    WaterrowerValuesRaw['heart_rate'] = hrm
+                Waterrower_byte_values = Convert_Waterrower_raw_to_byte(WaterrowerValuesRaw)
+                value = [dbus.Byte(0x2C), dbus.Byte(0x0B),
+                         dbus.Byte(Waterrower_byte_values[0]), dbus.Byte(Waterrower_byte_values[1]), dbus.Byte(Waterrower_byte_values[2]),
+                         dbus.Byte(Waterrower_byte_values[3]), dbus.Byte(Waterrower_byte_values[4]), dbus.Byte(Waterrower_byte_values[5]),
+                         dbus.Byte(Waterrower_byte_values[6]), dbus.Byte(Waterrower_byte_values[7]),
+                         dbus.Byte(Waterrower_byte_values[8]), dbus.Byte(Waterrower_byte_values[9]),
+                         dbus.Byte(Waterrower_byte_values[10]), dbus.Byte(Waterrower_byte_values[11]),dbus.Byte(Waterrower_byte_values[12]),dbus.Byte(Waterrower_byte_values[13]),dbus.Byte(Waterrower_byte_values[14]),
+                         dbus.Byte(Waterrower_byte_values[15]),
+                         dbus.Byte(Waterrower_byte_values[16]), dbus.Byte(Waterrower_byte_values[17]),
+                         ]
 
-            Waterrower_byte_values = Convert_Waterrower_raw_to_byte()
-
-            value = [dbus.Byte(0x2C), dbus.Byte(0x0B),
-                     dbus.Byte(Waterrower_byte_values[0]), dbus.Byte(Waterrower_byte_values[1]), dbus.Byte(Waterrower_byte_values[2]),
-                     dbus.Byte(Waterrower_byte_values[3]), dbus.Byte(Waterrower_byte_values[4]), dbus.Byte(Waterrower_byte_values[5]),
-                     dbus.Byte(Waterrower_byte_values[6]), dbus.Byte(Waterrower_byte_values[7]),
-                     dbus.Byte(Waterrower_byte_values[8]), dbus.Byte(Waterrower_byte_values[9]),
-                     dbus.Byte(Waterrower_byte_values[10]), dbus.Byte(Waterrower_byte_values[11]),dbus.Byte(Waterrower_byte_values[12]),dbus.Byte(Waterrower_byte_values[13]),dbus.Byte(Waterrower_byte_values[14]),
-                     dbus.Byte(Waterrower_byte_values[15]),
-                     dbus.Byte(Waterrower_byte_values[16]), dbus.Byte(Waterrower_byte_values[17]),
-                     ]
-
-            self.PropertiesChanged(GATT_CHRC_IFACE, { 'Value': value }, [])
-            return self.notifying
-        else:
-            logger.warning("no data from s4 interface")
-            pass
+                self.PropertiesChanged(GATT_CHRC_IFACE, { 'Value': value }, [])
+                return self.notifying
+        logger.warning("no data from s4 interface")
+        pass
 
     def _update_Waterrower_cb_value(self):
         print('Update Waterrower Data')
@@ -355,7 +371,6 @@ class FitnessMachineControlPoint(Characteristic):
             self.FITNESS_MACHINE_CONTROL_POINT_UUID,
             ['indicate', 'write'],
             service)
-        self.out_q = None
 
     def fmcp_cb(self, byte):
         print('fmcp_cb activate')
@@ -447,13 +462,8 @@ def sigint_handler(sig, frame):
 AGENT_PATH = "/com/inonoob/agent"
 
 
-def main(out_q,ble_in_q): #out_q
+def main(): #out_q
     global mainloop
-    global out_q_reset
-    global ble_in_q_value
-    out_q_reset = out_q
-    ble_in_q_value = ble_in_q
-
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
     # get the system bus

@@ -42,7 +42,12 @@ user=pi
 command=#PYTHON3# #REPO_DIR#/src/waterrowerthreads.py -i s4 -a
 autostart=false
 
-[program:pirowflo_SR_SmartRow_Bluetooth_AntPlus]
+[program:pirowflo_SR_Smartrow_Bluetooth_AntPlus_Fit]
+user=pi
+command=#PYTHON3# #REPO_DIR#/src/waterrowerthreads.py -i sr -b -a -f
+autostart=false
+
+[program:pirowflo_SR_Smartrow_Bluetooth_AntPlus]
 user=pi
 command=#PYTHON3# #REPO_DIR#/src/waterrowerthreads.py -i sr -b -a
 autostart=false

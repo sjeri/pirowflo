@@ -31,7 +31,7 @@ echo "----------------------------------------------"
 echo "installed needed packages for python          "
 echo "----------------------------------------------"
 
-sudo apt-get install -y python3 python3-gi python3-gi-cairo gir1.2-gtk-3.0 python3-pip libatlas-base-dev libglib2.0-dev libgirepository1.0-dev libcairo2-dev zlib1g-dev libfreetype6-dev liblcms2-dev libopenjp2-7 libtiff5
+sudo apt-get install -y python3 python3-gi python3-gi-cairo gir1.2-gtk-3.0 python3-pip libatlas-base-dev libglib2.0-dev libgirepository1.0-dev libcairo2-dev zlib1g-dev libfreetype6-dev liblcms2-dev libopenjp2-7 libtiff5 memcached
 
 echo " "
 
@@ -121,6 +121,13 @@ sudo chmod 655 /etc/systemd/system/supervisord.service
 sudo systemctl enable supervisord
 sudo rm /tmp/pirowflo*
 sudo rm /tmp/supervisord.log
+
+sudo sed -i -e 's/^-p/#-p/g' -e 's/^-l/#-l/g' /etc/memcached.conf
+sudo sed -i -e '/^-s.*/d' -e '/^-a.*/d' /etc/memcached.conf
+sudo sed -i -e '$ a -s /var/run/memcached/memcached.sock' -e '/^-a.*/d' -e '$ a -a 0766' /etc/memcached.conf
+sudo usermod -a -G memcache pi
+sudo chmod 770 /var/run/memcached/memcached.sock
+sudo systemctl enable memcached.service
 
 echo " "
 echo "------------------------------------------------------------"
