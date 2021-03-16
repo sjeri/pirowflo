@@ -193,11 +193,12 @@ class FitThread(threading.Thread):
         self.dl = None
         self.loop = True
         try:
-            self.mcclient = MemCclient('127.0.0.1:11211', serde=serde.pickle_serde, key_prefix=b'pirowflo_')
+            self.mcclient = MemCclient('unix:/var/run/memcached/memcached.sock', serde=serde.pickle_serde, key_prefix=b'pirowflo_')
             self.mcclient.version()
-        except Exception:
+        except Exception as e:
             self.mcclient = None
-            logger.warning("memcached not listening on 127.0.0.1:11211. No recording going to happen")
+            logger.warning(e)
+            logger.warning("memcached not listening on /var/run/memcached/memcached.sock. No recording going to happen")
         logger.info("initialized thread " + self.getName())
 
     def run(self):

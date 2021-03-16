@@ -177,7 +177,7 @@ def main():
     # this starts discovery, calls manager.run() and returns manager.smartrowmac
     #
     try:
-        mcclient = MemCclient('127.0.0.1:11211', serde=serde.pickle_serde, key_prefix=b'pirowflo_')
+        mcclient = MemCclient('unix:/var/run/memcached/memcached.sock', serde=serde.pickle_serde, key_prefix=b'pirowflo_')
         mcclient.version()
     except Exception:
         mcclient = None
